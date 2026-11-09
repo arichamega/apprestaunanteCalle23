@@ -1,54 +1,87 @@
 package com.example.myapplication.ui.cart
 
 import androidx.lifecycle.ViewModel
-import com.example.myapplication.data.model.Dish
-import com.example.myapplication.data.model.Order
-import com.example.myapplication.data.model.OrderItem
-import com.example.myapplication.data.repository.OrderRepository
+import com.example.myapplication.data.model.EstadoPedido
+import com.example.myapplication.data.model.ItemPedido
+import com.example.myapplication.data.model.Pedido
+import com.example.myapplication.data.model.Plato
+import com.example.myapplication.data.repository.RepositorioPedidos
+import com.example.myapplication.data.repository.RepositorioUsuarios
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class CartViewModel : ViewModel() {
-    private val _items = MutableStateFlow<List<OrderItem>>(emptyList())
-    val items: StateFlow<List<OrderItem>> = _items.asStateFlow()
+class ViewModelCarrito : ViewModel() {
+    private val _items = MutableStateFlow<List<ItemPedido>>(emptyList())
+    val items: StateFlow<List<ItemPedido>> = _items.asStateFlow()
 
-    fun addToCart(dish: Dish) {
-        _items.update { currentItems ->
-            val existingItem = currentItems.find { it.dishId == dish.id }
-            if (existingItem != null) {
-                currentItems.map {
-                    if (it.dishId == dish.id) it.copy(quantity = it.quantity + 1) else it
+    val cantidadTotalElementos: Int
+        get() = _items.value.sumOf { it.cantidad }
+
+    val precioTotal: Double
+        get() = _items.value.sumOf { it.precio * it.cantidad }
+
+    fun agregarAlCarrito(plato: Plato, cantidad: Int = 1, notas: String = "") {
+        _items.update { elementosActuales ->
+            val indiceExistente = elementosActuales.indexOfFirst { it.idPlato == plato.id && it.notas == notas }
+            if (indiceExistente >= 0) {
+                elementosActuales.mapIndexed { indice, elemento ->
+                    if (indice == indiceExistente) {
+                        elemento.copy(cantidad = elemento.cantidad + cantidad)
+                    } else {
+                        elemento
+                    }
                 }
             } else {
-                currentItems + OrderItem(dish.id, dish.name, 1, dish.price)
+                elementosActuales + ItemPedido(
+                    idPlato = plato.id,
+                    nombrePlato = plato.nombre,
+                    cantidad = cantidad,
+                    precio = plato.precio,
+                    notas = notas
+                )
             }
         }
     }
 
-    fun removeFromCart(dishId: String) {
-        _items.update { currentItems ->
-            currentItems.filterNot { it.dishId == dishId }
+    fun actualizarCantidad(idPlato: String, notas: String, nuevaCantidad: Int) {
+        if (nuevaCantidad <= 0) {
+            eliminarDelCarrito(idPlato, notas)
+        } else {
+            _items.update { elementosActuales ->
+                elementosActuales.map {
+                    if (it.idPlato == idPlato && it.notas == notas) {
+                        it.copy(cantidad = nuevaCantidad)
+                    } else {
+                        it
+                    }
+                }
+            }
         }
     }
 
-    fun checkout() {
+    fun eliminarDelCarrito(idPlato: String, notas: String = "") {
+        _items.update { elementosActuales ->
+            elementosActuales.filterNot { it.idPlato == idPlato && it.notas == notas }
+        }
+    }
+
+    fun confirmarPedido(numeroMesa: Int) {
         if (_items.value.isEmpty()) return
         
-        val newOrder = Order(
-            userId = "usuario_actual",
+        val nuevoPedido = Pedido(
+            idUsuario = RepositorioUsuarios.nombreUsuarioActual.value.ifEmpty { "Cliente" },
             items = _items.value,
-            totalPrice = totalPrice
+            precioTotal = precioTotal,
+            numeroMesa = numeroMesa,
+            estado = EstadoPedido.RECIBIDO
         )
-        OrderRepository.placeOrder(newOrder)
-        clearCart()
+        RepositorioPedidos.realizarPedido(nuevoPedido)
+        limpiarCarrito()
     }
 
-    fun clearCart() {
+    fun limpiarCarrito() {
         _items.value = emptyList()
     }
-
-    val totalPrice: Double
-        get() = _items.value.sumOf { it.price * it.quantity }
 }
