@@ -21,12 +21,9 @@ import com.example.myapplication.ui.menu.PantallaMenu
 import com.example.myapplication.ui.navigation.Pantalla
 import com.example.myapplication.ui.orders.PantallaEstadoPedido
 import com.example.myapplication.ui.orders.PantallaMisPedidos
-import com.example.myapplication.ui.profile.PantallaConfirmacion
 import com.example.myapplication.ui.profile.PantallaHistorialDirecciones
 import com.example.myapplication.ui.profile.PantallaHistorialPedidos
-import com.example.myapplication.ui.profile.PantallaNueva
 import com.example.myapplication.ui.profile.PantallaPerfil
-import com.example.myapplication.ui.profile.PantallaPromociones
 
 // inicio navegacion: contenedor principal navhost
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,28 +154,16 @@ fun MainScreen(
                 startDestination = if (rolUsuario == "ADMIN") Pantalla.Administrador.ruta else Pantalla.Menu.ruta,
                 modifier = Modifier.padding(innerPadding)
             ) {
-                // inicio navegacion: ruta promociones
-                composable(Pantalla.Promociones.ruta) {
-                    PantallaPromociones(
-                        alVolverAPerfil = {
-                            controladorNavegacion.navigate(Pantalla.Perfil.ruta)
-                        },
-                        alVolverAlMenu = {
-                            controladorNavegacion.navigate(Pantalla.Menu.ruta)
-                        }
-                    )
-                }
                 // inicio navegacion: ruta menu
                 composable(Pantalla.Menu.ruta) { 
                     PantallaMenu(
                         categoriaInicial = categoriaSeleccionadaMenu,
                         viewModelCarrito = viewModelCarrito,
+                        sesionIniciada = sesionIniciada,
+                        alIrALogin = { pasoActual = "login" },
+                        alIrARegistro = { pasoActual = "register" },
                         alAgregarAlCarrito = { plato, cantidad, notas -> 
-                            if (sesionIniciada) {
-                                viewModelCarrito.agregarAlCarrito(plato, cantidad, notas)
-                            } else {
-                                pasoActual = "login"
-                            }
+                            viewModelCarrito.agregarAlCarrito(plato, cantidad, notas)
                         },
                         alNavegarAlCarrito = {
                             if (sesionIniciada) {
@@ -205,10 +190,6 @@ fun MainScreen(
                         alVolverAlMenu = { 
                             // navegacion: volver a menu
                             controladorNavegacion.navigate(Pantalla.Menu.ruta)
-                        },
-                        alNavegarAPromociones = {
-                            // navegacion: ir a promociones
-                            controladorNavegacion.navigate(Pantalla.Promociones.ruta)
                         }
                     ) 
                 }
@@ -247,34 +228,6 @@ fun MainScreen(
                         alNavegarAHistorialDirecciones = {
                             // navegacion: ir a historial de direcciones
                             controladorNavegacion.navigate(Pantalla.HistorialDirecciones.ruta)
-                        },
-                        alNavegarAPromociones = {
-                            // navegacion: ir a promociones
-                            controladorNavegacion.navigate(Pantalla.Promociones.ruta)
-                        },
-                        alNavegarANuevaPantalla = {
-                            // navegacion: ir a nueva pantalla
-                            controladorNavegacion.navigate(Pantalla.NuevaPantalla.ruta)
-                        },
-                        alNavegarAConfirmacion = {
-                            // navegacion: ir a pantalla confirmaciones
-                            controladorNavegacion.navigate(Pantalla.PantallaConfirmaciones.ruta)
-                        }
-                    )
-                }
-                // inicio navegacion: ruta pantalla confirmaciones
-                composable(Pantalla.PantallaConfirmaciones.ruta) {
-                    PantallaConfirmacion(
-                        alVolverAPerfil = {
-                            controladorNavegacion.navigate(Pantalla.Perfil.ruta)
-                        }
-                    )
-                }
-                // inicio navegacion: ruta nueva pantalla
-                composable(Pantalla.NuevaPantalla.ruta) {
-                    PantallaNueva(
-                        alVolverAPerfil = {
-                            controladorNavegacion.navigate(Pantalla.Perfil.ruta)
                         }
                     )
                 }

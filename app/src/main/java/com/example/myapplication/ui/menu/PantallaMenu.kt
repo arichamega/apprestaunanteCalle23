@@ -55,6 +55,9 @@ fun PantallaMenu(
     viewModelCarrito: ViewModelCarrito = viewModel(),
     viewModelBolsa: ViewModelBolsa = viewModel(),
     viewModelMenu: ViewModelMenu = viewModel(),
+    sesionIniciada: Boolean = true,
+    alIrALogin: () -> Unit = {},
+    alIrARegistro: () -> Unit = {},
     alAgregarAlCarrito: (Plato, Int, String) -> Unit,
     alNavegarAlCarrito: () -> Unit = {},
     alCerrarSesion: () -> Unit = {}
@@ -67,9 +70,18 @@ fun PantallaMenu(
     var consultaBusqueda by remember { mutableStateOf("") }
     var platoSeleccionadoDetalle by remember { mutableStateOf<Plato?>(null) }
     var mostrarHojaBolsa by remember { mutableStateOf(false) }
+    var mostrarDialogoInvitado by remember { mutableStateOf(false) }
 
     val estadoSnackbar = remember { SnackbarHostState() }
     val alcanceCorrutina = rememberCoroutineScope()
+
+    val ejecutarAccionProtegida = { accion: () -> Unit ->
+        if (sesionIniciada) {
+            accion()
+        } else {
+            mostrarDialogoInvitado = true
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(estadoSnackbar) },
@@ -145,7 +157,7 @@ fun PantallaMenu(
                     Triple("Entradas", Icons.Default.Fastfood, "Entradas"),
                     Triple("Bebidas", Icons.Default.WineBar, "Bebidas"),
                     Triple("Postres", Icons.Default.Icecream, "Postres"),
-                    Triple("Favoritos", Icons.Default.Star, "Favoritos")
+                    Triple("Favoritos", Icons.Default.Star, "Favoritos"),
                 )
                 items(datosCategorias) { (etiqueta, icono, categoria) ->
                     val estaSeleccionado = categoria == categoriaSeleccionada
@@ -196,10 +208,10 @@ fun PantallaMenu(
                 if (consultaBusqueda.isNotEmpty()) {
                     coincideBusqueda
                 } else {
-                    if (categoriaSeleccionada == "Favoritos") {
-                        plato.esFavorito
-                    } else {
-                        plato.categoria == categoriaSeleccionada
+                    when (categoriaSeleccionada) {
+                        "Favoritos" -> plato.esFavorito
+                        //"promociones" -> plato.categoria == "promociones" || plato.esPopular // promociones
+                        else -> plato.categoria == categoriaSeleccionada
                     }
                 }
             }
@@ -228,7 +240,7 @@ fun PantallaMenu(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (categoriaSeleccionada == "Favoritos") "Toca el ícono del corazón ❤️ en cualquier plato para guardarlo aquí." else "Intenta buscar con otra palabra.",
+                            text = if (categoriaSeleccionada == "Favoritos") "Toca el ícono del corazón en cualquier plato para guardarlo aquí." else "Intenta buscar con otra palabra.",
                             color = Color.Gray,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
@@ -245,15 +257,19 @@ fun PantallaMenu(
                             plato = plato, 
                             alHacerClic = { platoSeleccionadoDetalle = plato },
                             alAgregarAlCarrito = {
-                                alAgregarAlCarrito(plato, 1, "")
-                                alcanceCorrutina.launch {
-                                    estadoSnackbar.showSnackbar("¡${plato.nombre} agregado al Carrito!")
+                                ejecutarAccionProtegida {
+                                    alAgregarAlCarrito(plato, 1, "")
+                                    alcanceCorrutina.launch {
+                                        estadoSnackbar.showSnackbar("¡${plato.nombre} agregado al Carrito!")
+                                    }
                                 }
                             },
                             alAgregarABolsa = {
-                                viewModelBolsa.agregarABolsa(plato, 1, "")
-                                alcanceCorrutina.launch {
-                                    estadoSnackbar.showSnackbar("¡${plato.nombre} agregado a la Bolsa!")
+                                ejecutarAccionProtegida {
+                                    viewModelBolsa.agregarABolsa(plato, 1, "")
+                                    alcanceCorrutina.launch {
+                                        estadoSnackbar.showSnackbar("¡${plato.nombre} agregado a la Bolsa!")
+                                    }
                                 }
                             },
                             alAlternarFavorito = { viewModelMenu.alternarFavorito(plato.id) }
@@ -263,23 +279,55 @@ fun PantallaMenu(
             }
         }
 
+        if (mostrarDialogoInvitado) {
+            AlertDialog(
+                onDismissRequest = { mostrarDialogoInvitado = false },
+                title = { Text("Inicio de Sesión Requerido", fontWeight = FontWeight.Bold) },
+                text = { Text("Para agregar platos a tu bolsa y realizar un pedido, debes iniciar sesión o crear una cuenta.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            mostrarDialogoInvitado = false
+                            alIrALogin()
+                        }
+                    ) {
+                        Text("Iniciar Sesión")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = {
+                            mostrarDialogoInvitado = false
+                            alIrARegistro()
+                        }
+                    ) {
+                        Text("Crear Cuenta")
+                    }
+                }
+            )
+        }
+
         platoSeleccionadoDetalle?.let { plato ->
-            // RF12 / RF13: Apertura de hoja de detalle para personalizar notas y elegir cantidad
+            // Apertura de hoja de detalle para personalizar notas y elegir cantidad
             HojaDetallePlato(
                 plato = plato,
                 alCerrar = { platoSeleccionadoDetalle = null },
                 alAgregarAlCarrito = { p, cantidad, notas ->
-                    alAgregarAlCarrito(p, cantidad, notas)
-                    alcanceCorrutina.launch {
-                        val mensaje = if (cantidad > 1) "¡${cantidad}× ${p.nombre} agregados al Carrito!" else "¡${p.nombre} agregado al Carrito!"
-                        estadoSnackbar.showSnackbar(mensaje)
+                    ejecutarAccionProtegida {
+                        alAgregarAlCarrito(p, cantidad, notas)
+                        alcanceCorrutina.launch {
+                            val mensaje = if (cantidad > 1) "¡${cantidad}× ${p.nombre} agregados al Carrito!" else "¡${p.nombre} agregado al Carrito!"
+                            estadoSnackbar.showSnackbar(mensaje)
+                        }
                     }
                 },
                 alAgregarABolsa = { p, cantidad, notas ->
-                    viewModelBolsa.agregarABolsa(p, cantidad, notas)
-                    alcanceCorrutina.launch {
-                        val mensaje = if (cantidad > 1) "¡${cantidad}× ${p.nombre} agregados a la Bolsa!" else "¡${p.nombre} agregado a la Bolsa!"
-                        estadoSnackbar.showSnackbar(mensaje)
+                    ejecutarAccionProtegida {
+                        viewModelBolsa.agregarABolsa(p, cantidad, notas)
+                        alcanceCorrutina.launch {
+                            val mensaje = if (cantidad > 1) "¡${cantidad}× ${p.nombre} agregados a la Bolsa!" else "¡${p.nombre} agregado a la Bolsa!"
+                            estadoSnackbar.showSnackbar(mensaje)
+                        }
                     }
                 }
             )
@@ -361,13 +409,12 @@ fun ElementoPlato(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-
+                //etiquetas
                 val textoEtiqueta = when {
                     plato.esPopular -> "Favorito"
                     plato.esNuevo -> "Nuevo"
                     else -> null
                 }
-                
                 if (textoEtiqueta != null) {
                     Surface(
                         modifier = Modifier.padding(12.dp),
@@ -567,7 +614,7 @@ fun HojaDetallePlato(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 🚩 [RF12 - PERSONALIZACIÓN DE PLATO]: Campo para escribir indicaciones personalizadas (sin cebolla, extra salsa, etc.)
+            // PERSONALIZACIÓN DE PLATO]: Campo para escribir indicaciones personalizadas (sin cebolla, extra salsa, etc.)
             OutlinedTextField(
                 value = notas,
                 onValueChange = { notas = it },

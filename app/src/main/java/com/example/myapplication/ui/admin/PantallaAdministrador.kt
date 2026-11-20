@@ -26,7 +26,7 @@ import com.example.myapplication.data.model.EstadoPedido
 import com.example.myapplication.data.model.Pedido
 import java.util.Locale
 
-// 🚩 [PANTALLA ADMINISTRADOR]: Comandas activas e Historial para Administrador
+//  [PANTALLA ADMINISTRADOR]: Comandas activas e Historial para Administrador
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaAdministrador(

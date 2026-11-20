@@ -6,7 +6,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.TableBar
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -25,7 +28,7 @@ import com.example.myapplication.data.model.Pedido
 import com.example.myapplication.ui.admin.ViewModelAdmin
 import java.util.Locale
 
-// 🚩 [PANTALLA MIS PEDIDOS]: Historial personal de pedidos del cliente ("Mis Pedidos")
+// 🚩 [PANTALLA MIS PEDIDOS]: Historial personal de pedidos del cliente ("Mis Pedidos") con opción de editar cantidad/eliminar platos
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaMisPedidos(
@@ -84,7 +87,18 @@ fun PantallaMisPedidos(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(pedidos) { pedido ->
-                        TarjetaPedidoCliente(pedido)
+                        TarjetaPedidoCliente(
+                            pedido = pedido,
+                            alActualizarCantidad = { idPlato, notas, nuevaCant ->
+                                viewModel.actualizarCantidadItemPedido(pedido.id, idPlato, notas, nuevaCant)
+                            },
+                            alEliminarItem = { idPlato, notas ->
+                                viewModel.eliminarItemDePedido(pedido.id, idPlato, notas)
+                            },
+                            alCancelarPedido = {
+                                viewModel.cancelarPedido(pedido.id)
+                            }
+                        )
                     }
                 }
             }
@@ -93,7 +107,14 @@ fun PantallaMisPedidos(
 }
 
 @Composable
-fun TarjetaPedidoCliente(pedido: Pedido) {
+fun TarjetaPedidoCliente(
+    pedido: Pedido,
+    alActualizarCantidad: (idPlato: String, notas: String, nuevaCantidad: Int) -> Unit = { _, _, _ -> },
+    alEliminarItem: (idPlato: String, notas: String) -> Unit = { _, _ -> },
+    alCancelarPedido: () -> Unit = {}
+) {
+    val sePuedeEditar = pedido.estado == EstadoPedido.RECIBIDO || pedido.estado == EstadoPedido.EN_COCINA
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -174,34 +195,78 @@ fun TarjetaPedidoCliente(pedido: Pedido) {
             Spacer(modifier = Modifier.height(8.dp))
 
             pedido.items.forEach { item ->
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 4.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${item.cantidad}x ${item.nombrePlato}",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        if (item.notas.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Nota: ${item.notas}",
-                                fontSize = 12.sp,
-                                color = Color(0xFFE65100)
+                                text = item.nombrePlato,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
                             )
+                            if (item.notas.isNotEmpty()) {
+                                Text(
+                                    text = "Nota: ${item.notas}",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFE65100)
+                                )
+                            }
                         }
+
+                        Text(
+                            text = "S/ ${String.format(Locale.US, "%.2f", item.precio * item.cantidad)}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
 
-                    Text(
-                        text = "S/ ${String.format(Locale.US, "%.2f", item.precio * item.cantidad)}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    if (sePuedeEditar) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { alActualizarCantidad(item.idPlato, item.notas, item.cantidad - 1) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = "Disminuir", modifier = Modifier.size(16.dp))
+                                }
+
+                                Text(
+                                    text = "${item.cantidad}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+
+                                IconButton(
+                                    onClick = { alActualizarCantidad(item.idPlato, item.notas, item.cantidad + 1) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Aumentar", modifier = Modifier.size(16.dp))
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { alEliminarItem(item.idPlato, item.notas) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
                 }
             }
 
@@ -221,6 +286,17 @@ fun TarjetaPedidoCliente(pedido: Pedido) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
+            }
+
+            if (sePuedeEditar) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = alCancelarPedido,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Cancelar Pedido")
+                }
             }
         }
     }

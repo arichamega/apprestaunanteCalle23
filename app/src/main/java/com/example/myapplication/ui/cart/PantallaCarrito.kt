@@ -39,8 +39,7 @@ fun PantallaCarrito(
     titulo: String = "Mi Bolsa - Calle 28",
     viewModel: ViewModelCarrito = viewModel(),
     alRealizarPedido: () -> Unit,
-    alVolverAlMenu: () -> Unit,
-    alNavegarAPromociones: () -> Unit = {}
+    alVolverAlMenu: () -> Unit
 ) {
     val listaItems by viewModel.items.collectAsState()
     val montoTotal = listaItems.sumOf { it.precio * it.cantidad }

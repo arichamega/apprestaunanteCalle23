@@ -112,4 +112,71 @@ object RepositorioPedidos {
             Log.e("Firestore", "Excepción al registrar pago en Firestore", e)
         }
     }
+
+    fun actualizarCantidadItemPedido(idPedido: String, idPlato: String, notas: String, nuevaCantidad: Int) {
+        var pedidoModificado: Pedido? = null
+        _pedidos.update { lista ->
+            lista.map { pedido ->
+                if (pedido.id == idPedido) {
+                    val nuevosItems = if (nuevaCantidad <= 0) {
+                        pedido.items.filterNot { it.idPlato == idPlato && it.notas == notas }
+                    } else {
+                        pedido.items.map { item ->
+                            if (item.idPlato == idPlato && item.notas == notas) {
+                                item.copy(cantidad = nuevaCantidad)
+                            } else {
+                                item
+                            }
+                        }
+                    }
+                    val nuevoTotal = nuevosItems.sumOf { it.precio * it.cantidad }
+                    val nuevoEstado = if (nuevosItems.isEmpty()) EstadoPedido.CANCELADO else pedido.estado
+                    val pedidoMod = pedido.copy(items = nuevosItems, precioTotal = nuevoTotal, estado = nuevoEstado)
+                    pedidoModificado = pedidoMod
+                    pedidoMod
+                } else {
+                    pedido
+                }
+            }
+        }
+
+        pedidoModificado?.let { mod ->
+            try {
+                val datosItems = mod.items.map { item ->
+                    hashMapOf(
+                        "idPlato" to item.idPlato,
+                        "nombrePlato" to item.nombrePlato,
+                        "cantidad" to item.cantidad,
+                        "precio" to item.precio,
+                        "notas" to item.notas
+                    )
+                }
+                val actualizaciones = hashMapOf<String, Any>(
+                    "items" to datosItems,
+                    "precioTotal" to mod.precioTotal,
+                    "estado" to mod.estado.name,
+                    "nombreEstado" to mod.estado.nombreMostrado
+                )
+                firestore?.collection("orders")
+                    ?.document("order_$idPedido")
+                    ?.update(actualizaciones)
+                    ?.addOnSuccessListener {
+                        Log.d("Firestore", "✅ Pedido y total recalculado guardados en Firestore: $idPedido -> S/ ${mod.precioTotal}")
+                    }
+                    ?.addOnFailureListener { e ->
+                        Log.e("Firestore", "❌ Error al actualizar items y total en Firestore: ${e.message}", e)
+                    }
+            } catch (e: Exception) {
+                Log.e("Firestore", "Excepción al actualizar items en Firestore", e)
+            }
+        }
+    }
+
+    fun eliminarItemDePedido(idPedido: String, idPlato: String, notas: String) {
+        actualizarCantidadItemPedido(idPedido, idPlato, notas, 0)
+    }
+
+    fun cancelarPedido(idPedido: String) {
+        actualizarEstadoPedido(idPedido, EstadoPedido.CANCELADO)
+    }
 }

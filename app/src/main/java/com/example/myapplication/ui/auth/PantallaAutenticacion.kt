@@ -2,8 +2,10 @@ package com.example.myapplication.ui.auth
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,7 +76,7 @@ fun PantallaBienvenida(alExplorarMenu: () -> Unit, alIniciarSesion: () -> Unit) 
     }
 }
 
-//  [PANTALLA INICIAR SESIÓN]: Pantalla de Inicio de Sesión
+// 🚩 [RF08 - CONTROL DE ERROR EN INICIAR SESIÓN]: Pantalla de Inicio de Sesión con validación de credenciales
 @Composable
 fun PantallaIniciarSesion(
     alIniciarSesionExitoso: (String) -> Unit, 
@@ -84,6 +86,7 @@ fun PantallaIniciarSesion(
     var correo by rememberSaveable { mutableStateOf("") }
     var contrasena by rememberSaveable { mutableStateOf("") }
     var estaCargando by remember { mutableStateOf(false) }
+    var mensajeError by remember { mutableStateOf<String?>(null) }
     val contexto = LocalContext.current
 
     Surface(
@@ -93,7 +96,8 @@ fun PantallaIniciarSesion(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -108,51 +112,78 @@ fun PantallaIniciarSesion(
                 fontWeight = FontWeight.Bold
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
                 value = correo,
-                onValueChange = { correo = it },
+                onValueChange = { 
+                    correo = it 
+                    mensajeError = null
+                },
                 label = { Text("Correo electrónico") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !estaCargando
+                enabled = !estaCargando,
+                isError = mensajeError != null
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = contrasena,
-                onValueChange = { contrasena = it },
+                onValueChange = { 
+                    contrasena = it 
+                    mensajeError = null
+                },
                 label = { Text("Contraseña") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !estaCargando
+                enabled = !estaCargando,
+                isError = mensajeError != null
             )
+
+            if (mensajeError != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = mensajeError!!,
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             if (estaCargando) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else {
-                // inicio boton: ingresar login
+                // inicio boton: ingresar login (RF08)
                 Button(
                     onClick = { 
                         if (correo.isEmpty() || contrasena.isEmpty()) {
+                            mensajeError = "Por favor llena todos los campos"
                             Toast.makeText(contexto, "Por favor llena todos los campos", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         
                         estaCargando = true
-                        RepositorioUsuarios.iniciarSesion(correo, contrasena) { exito, mensajeError ->
+                        mensajeError = null
+                        RepositorioUsuarios.iniciarSesion(correo, contrasena) { exito, error ->
                             estaCargando = false
                             if (exito) {
-                                val rol = if (correo.contains("admin")) "ADMIN" else "CLIENTE"
-                                // navegacion: inicio sesion exitoso
+                                val rol = if (correo.contains("admin", ignoreCase = true)) "ADMIN" else "CLIENTE"
                                 alIniciarSesionExitoso(rol)
                             } else {
-                                Toast.makeText(contexto, mensajeError ?: "Error al iniciar sesión", Toast.LENGTH_LONG).show()
+                                mensajeError = error ?: "Correo o contraseña incorrectos"
+                                Toast.makeText(contexto, mensajeError, Toast.LENGTH_LONG).show()
                             }
                         }
                     },
@@ -167,7 +198,6 @@ fun PantallaIniciarSesion(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // inicio boton: olvidaste tu contrasena
             TextButton(
                 onClick = alHacerClicEnRecuperarContrasena,
                 enabled = !estaCargando
@@ -177,7 +207,6 @@ fun PantallaIniciarSesion(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // inicio boton: ir a registrarse
             TextButton(onClick = alHacerClicEnRegistrarse, enabled = !estaCargando) {
                 Text("¿No tienes una cuenta? Regístrate aquí", color = MaterialTheme.colorScheme.primary)
             }
@@ -222,7 +251,6 @@ fun PantallaRecuperarCuenta(alVolverAlLogin: () -> Unit) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // inicio boton: enviar correo recuperacion
             Button(
                 onClick = {
                     if (correoRecuperacion.isEmpty()) {
@@ -241,7 +269,6 @@ fun PantallaRecuperarCuenta(alVolverAlLogin: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // inicio boton: volver a login
             TextButton(onClick = alVolverAlLogin) {
                 Text("Volver al Login", color = MaterialTheme.colorScheme.primary)
             }
@@ -249,7 +276,7 @@ fun PantallaRecuperarCuenta(alVolverAlLogin: () -> Unit) {
     }
 }
 
-// 🚩 [PANTALLA REGISTRO CUENTA]: Pantalla de Registro de Cuentas Nuevas
+// 🚩 [RF06 - VERIFICACIÓN DE CORREO DUPLICADO]: Pantalla de Registro con comprobación de correo existente
 @Composable
 fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesionClick: () -> Unit) {
     var nombre by rememberSaveable { mutableStateOf("") }
@@ -257,6 +284,7 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
     var telefono by rememberSaveable { mutableStateOf("") }
     var contrasena by rememberSaveable { mutableStateOf("") }
     var estaCargando by remember { mutableStateOf(false) }
+    var mensajeError by remember { mutableStateOf<String?>(null) }
     val contexto = LocalContext.current
 
     Surface(
@@ -266,7 +294,8 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -285,11 +314,14 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
             
             Text(text = "Crea tu cuenta para empezar a disfrutar", color = MaterialTheme.colorScheme.secondary)
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
                 value = nombre,
-                onValueChange = { nombre = it },
+                onValueChange = { 
+                    nombre = it
+                    mensajeError = null
+                },
                 label = { Text("Nombre Completo") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -300,18 +332,27 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
 
             OutlinedTextField(
                 value = correo,
-                onValueChange = { correo = it },
+                onValueChange = { 
+                    correo = it
+                    mensajeError = null
+                },
                 label = { Text("Correo Electrónico") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !estaCargando
+                enabled = !estaCargando,
+                isError = mensajeError?.contains("correo", ignoreCase = true) == true
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = telefono,
-                onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 9) telefono = it },
+                onValueChange = { 
+                    if (it.all { char -> char.isDigit() } && it.length <= 9) {
+                        telefono = it
+                        mensajeError = null
+                    }
+                },
                 label = { Text("Teléfono (9 dígitos)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -326,7 +367,10 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
 
             OutlinedTextField(
                 value = contrasena,
-                onValueChange = { contrasena = it },
+                onValueChange = { 
+                    contrasena = it
+                    mensajeError = null
+                },
                 label = { Text("Contraseña") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -334,44 +378,66 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
                 enabled = !estaCargando
             )
 
+            if (mensajeError != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = mensajeError!!,
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             if (estaCargando) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else {
-                // inicio boton: registrarse
+                // inicio boton: registrarse (RF06)
                 Button(
                     onClick = {
                         if (nombre.isEmpty() || correo.isEmpty() || contrasena.isEmpty()) {
+                            mensajeError = "Por favor llena todos los campos"
                             Toast.makeText(contexto, "Por favor llena todos los campos", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         
                         if (!correo.endsWith("@gmail.com")) {
+                            mensajeError = "El correo debe ser @gmail.com"
                             Toast.makeText(contexto, "El correo debe ser @gmail.com", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
                         if (telefono.length != 9 || !telefono.startsWith("9")) {
+                            mensajeError = "El teléfono debe tener 9 dígitos e iniciar con 9"
                             Toast.makeText(contexto, "El teléfono debe tener 9 dígitos e iniciar con 9", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         
                         if (contrasena.length < 8) {
+                            mensajeError = "La contraseña debe tener al menos 8 caracteres"
                             Toast.makeText(contexto, "La contraseña debe tener al menos 8 caracteres", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
                         estaCargando = true
-                        RepositorioUsuarios.registrar(nombre, correo, contrasena, telefono) { exito, mensajeError ->
+                        mensajeError = null
+                        RepositorioUsuarios.registrar(nombre, correo, contrasena, telefono) { exito, error ->
                             estaCargando = false
                             if (exito) {
-                                Toast.makeText(contexto, "sesión guardada", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(contexto, "Sesión iniciada correctamente", Toast.LENGTH_SHORT).show()
                                 val rol = if (correo.contains("admin", ignoreCase = true)) "ADMIN" else "CLIENTE"
-                                // navegacion: registro exitoso
                                 alRegistrarExitoso(rol)
                             } else {
-                                Toast.makeText(contexto, mensajeError ?: "Error al registrar", Toast.LENGTH_LONG).show()
+                                mensajeError = error ?: "El correo electrónico ya está en uso"
+                                Toast.makeText(contexto, mensajeError, Toast.LENGTH_LONG).show()
                             }
                         }
                     },
@@ -386,7 +452,6 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // inicio boton: ya tienes cuenta
             TextButton(onClick = alIniciarSesionClick, enabled = !estaCargando) {
                 Text("¿Ya tienes una cuenta? Inicia sesión", color = MaterialTheme.colorScheme.primary)
             }

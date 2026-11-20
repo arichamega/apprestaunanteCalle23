@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.ConfirmationNumber
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOn
@@ -37,10 +36,7 @@ fun PantallaPerfil(
     alNavegarAFavoritos: () -> Unit = {},
     alNavegarAPedidos: () -> Unit = {},
     alNavegarAHistorialPedidos: () -> Unit = {},
-    alNavegarAHistorialDirecciones: () -> Unit = {},
-    alNavegarAPromociones: () -> Unit = {},
-    alNavegarANuevaPantalla: () -> Unit = {},
-    alNavegarAConfirmacion: () -> Unit = {}
+    alNavegarAHistorialDirecciones: () -> Unit = {}
 ) {
     val nombreUsuarioActual by RepositorioUsuarios.nombreUsuarioActual.collectAsState()
     val correo = RepositorioUsuarios.correoUsuarioActual ?: "cliente@calle28.pe"
@@ -140,17 +136,6 @@ fun PantallaPerfil(
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column {
-                    ListItem(
-                        headlineContent = { Text("promociones", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Revisa todas las promociones") },
-                        leadingContent = {
-                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { alNavegarAPromociones() }
-                    )
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.2f))
                     // inicio navegacion: ir a historial de pedidos desde perfil
                     ListItem(
                         headlineContent = { Text("Historial de Pedidos", fontWeight = FontWeight.SemiBold) },
@@ -200,32 +185,6 @@ fun PantallaPerfil(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { alNavegarAFavoritos() }
-                    )
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.2f))
-
-                    // inicio navegacion: ir a nueva pantalla desde perfil
-                    ListItem(
-                        headlineContent = { Text("Nueva Pantalla", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Escribe y registra un mensaje") },
-                        leadingContent = {
-                            Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { alNavegarANuevaPantalla() }
-                    )
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.2f))
-
-                    // inicio navegacion: ir a pantalla confirmacion desde perfil
-                    ListItem(
-                        headlineContent = { Text("Pantalla Confirmación", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Registra y confirma tu dirección") },
-                        leadingContent = {
-                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { alNavegarAConfirmacion() }
                     )
                 }
             }

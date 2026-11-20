@@ -3,9 +3,7 @@ package com.example.myapplication.ui.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.BorderColor
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RestaurantMenu
@@ -24,10 +22,6 @@ sealed class Pantalla(val ruta: String, val titulo: String, val icono: ImageVect
     object Perfil : Pantalla("perfil", "Perfil", Icons.Default.Person)
     object HistorialPedidosCliente : Pantalla("historial_pedidos_cliente", "Historial de Pedidos", Icons.Default.History)
     object HistorialDirecciones : Pantalla("historial_direcciones", "Mis Direcciones", Icons.Default.LocationOn)
-    object Promociones : Pantalla("promociones", "Promociones", Icons.Default.LocalOffer)
-    object NuevaPantalla : Pantalla("nueva_pantalla", "Nueva Pantalla", Icons.Default.Edit)
-
-    object PantallaConfirmaciones : Pantalla("confirmaciones", "Confirmación", Icons.Default.Edit)
     object Administrador : Pantalla("admin", "Pedidos", Icons.AutoMirrored.Filled.ReceiptLong)
     object HistorialAdmin : Pantalla("historial_admin", "Historial", Icons.Default.History)
     object GestionMenu : Pantalla("gestion_menu", "Gestión Menú", Icons.Default.RestaurantMenu)

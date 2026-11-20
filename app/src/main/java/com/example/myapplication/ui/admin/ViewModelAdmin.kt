@@ -22,4 +22,22 @@ class ViewModelAdmin : ViewModel() {
             RepositorioPedidos.marcarComoPagado(idPedido)
         }
     }
+
+    fun actualizarCantidadItemPedido(idPedido: String, idPlato: String, notas: String, nuevaCantidad: Int) {
+        viewModelScope.launch {
+            RepositorioPedidos.actualizarCantidadItemPedido(idPedido, idPlato, notas, nuevaCantidad)
+        }
+    }
+
+    fun eliminarItemDePedido(idPedido: String, idPlato: String, notas: String) {
+        viewModelScope.launch {
+            RepositorioPedidos.eliminarItemDePedido(idPedido, idPlato, notas)
+        }
+    }
+
+    fun cancelarPedido(idPedido: String) {
+        viewModelScope.launch {
+            RepositorioPedidos.cancelarPedido(idPedido)
+        }
+    }
 }
