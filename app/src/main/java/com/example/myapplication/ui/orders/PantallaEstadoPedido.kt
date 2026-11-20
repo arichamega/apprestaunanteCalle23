@@ -35,7 +35,7 @@ fun PantallaEstadoPedido(
     alVolverAlMenu: () -> Unit = {}
 ) {
     val pedidos by viewModel.pedidos.collectAsState()
-    val pedidoActivo = pedidos.lastOrNull { it.estado != EstadoPedido.CANCELADO }
+    val pedidoActivo = pedidos.lastOrNull { it.estado != EstadoPedido.CANCELADO && it.estado != EstadoPedido.SERVIDO }
 
     Scaffold(
         topBar = {

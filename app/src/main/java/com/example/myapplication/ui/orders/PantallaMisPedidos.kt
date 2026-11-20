@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,11 +37,14 @@ fun PantallaMisPedidos(
     alCerrarSesion: () -> Unit = {}
 ) {
     val pedidos by viewModel.pedidos.collectAsState()
+    val pedidosActivos = remember(pedidos) {
+        pedidos.filter { it.estado != EstadoPedido.SERVIDO && it.estado != EstadoPedido.CANCELADO }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mis Pedidos", fontWeight = FontWeight.Bold) },
+                title = { Text("Mis Pedidos Activos", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
@@ -51,7 +55,7 @@ fun PantallaMisPedidos(
                 .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
         ) {
-            if (pedidos.isEmpty()) {
+            if (pedidosActivos.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
                     contentAlignment = Alignment.Center
@@ -86,7 +90,7 @@ fun PantallaMisPedidos(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(pedidos) { pedido ->
+                    items(pedidosActivos) { pedido ->
                         TarjetaPedidoCliente(
                             pedido = pedido,
                             alActualizarCantidad = { idPlato, notas, nuevaCant ->
