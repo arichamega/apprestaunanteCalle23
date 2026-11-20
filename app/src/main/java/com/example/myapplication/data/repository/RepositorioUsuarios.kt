@@ -3,7 +3,9 @@ package com.example.myapplication.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.userProfileChangeRequest
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +24,14 @@ object RepositorioUsuarios {
     private val auth: FirebaseAuth? by lazy {
         try {
             FirebaseAuth.getInstance()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private val firestore: FirebaseFirestore? by lazy {
+        try {
+            FirebaseFirestore.getInstance()
         } catch (_: Exception) {
             null
         }
@@ -106,42 +116,105 @@ object RepositorioUsuarios {
         prefs?.edit()?.putString("registered_users_json", jsonArray.toString())?.apply()
     }
 
+    // 🚩 [RF06 - VERIFICACIÓN DE CORREO DUPLICADO]: Consulta base de datos remota/local antes de registrar
     fun registrar(nombre: String, correo: String, contrasena: String, telefono: String = "", alFinalizar: (Boolean, String?) -> Unit) {
+        // 1. Consulta en repositorio local para verificar si el correo ya existe
         val usuarios = obtenerUsuariosRegistrados()
         if (usuarios.any { it.correo.equals(correo, ignoreCase = true) }) {
             alFinalizar(false, "El correo electrónico ya está registrado")
             return
         }
 
+        val rol = if (correo.contains("admin", ignoreCase = true)) "ADMIN" else "CLIENTE"
         val nuevaCuenta = CuentaUsuario(
             nombre = nombre,
             correo = correo,
             contrasena = contrasena,
             telefono = telefono,
-            rol = if (correo.contains("admin", ignoreCase = true)) "ADMIN" else "CLIENTE"
+            rol = rol
         )
-        guardarUsuarioRegistrado(nuevaCuenta)
 
-        _nombreUsuarioActual.value = nombre
-        _correoUsuarioActual.value = correo
-        prefs?.edit()
-            ?.putString("logged_in_email", correo)
-            ?.putString("logged_in_name", nombre)
-            ?.apply()
+        val firestoreInst = firestore
+        val authInst = auth
 
-        try {
-            auth?.createUserWithEmailAndPassword(correo, contrasena)
-                ?.addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        val profileUpdates = userProfileChangeRequest { displayName = nombre }
-                        auth?.currentUser?.updateProfile(profileUpdates)
+        // 2. Si Firestore está disponible, consultar la base de datos remota para la existencia del correo
+        if (firestoreInst != null) {
+            firestoreInst.collection("users")
+                .whereEqualTo("email", correo)
+                .get()
+                .addOnSuccessListener { querySnapshot ->
+                    if (querySnapshot != null && !querySnapshot.isEmpty) {
+                        // El correo ya existe en la base de datos
+                        alFinalizar(false, "El correo electrónico ya está registrado")
+                    } else {
+                        procesarRegistroNubeOLocal(nuevaCuenta, authInst, firestoreInst, alFinalizar)
                     }
                 }
-        } catch (e: Exception) {
-            e.printStackTrace()
+                .addOnFailureListener {
+                    // Si falla la consulta a Firestore, continuar con la verificación en Auth / guardado
+                    procesarRegistroNubeOLocal(nuevaCuenta, authInst, firestoreInst, alFinalizar)
+                }
+        } else {
+            procesarRegistroNubeOLocal(nuevaCuenta, authInst, firestoreInst, alFinalizar)
         }
+    }
 
-        alFinalizar(true, null)
+    private fun procesarRegistroNubeOLocal(
+        nuevaCuenta: CuentaUsuario,
+        authInst: FirebaseAuth?,
+        firestoreInst: FirebaseFirestore?,
+        alFinalizar: (Boolean, String?) -> Unit
+    ) {
+        if (authInst != null) {
+            authInst.createUserWithEmailAndPassword(nuevaCuenta.correo, nuevaCuenta.contrasena)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val profileUpdates = userProfileChangeRequest { displayName = nuevaCuenta.nombre }
+                        authInst.currentUser?.updateProfile(profileUpdates)
+
+                        // Guardar datos del usuario en la colección 'users' de Firestore
+                        val datosUsuario = mapOf(
+                            "name" to nuevaCuenta.nombre,
+                            "email" to nuevaCuenta.correo,
+                            "phone" to nuevaCuenta.telefono,
+                            "role" to nuevaCuenta.rol
+                        )
+                        firestoreInst?.collection("users")
+                            ?.document(nuevaCuenta.correo)
+                            ?.set(datosUsuario)
+
+                        completarRegistroLocal(nuevaCuenta)
+                        alFinalizar(true, null)
+                    } else {
+                        val exception = task.exception
+                        val esDuplicado = exception is FirebaseAuthUserCollisionException ||
+                                exception?.message?.contains("already in use", ignoreCase = true) == true ||
+                                exception?.message?.contains("already exists", ignoreCase = true) == true
+                        
+                        if (esDuplicado) {
+                            alFinalizar(false, "El correo electrónico ya está registrado")
+                        } else {
+                            // Si es otro tipo de error en Firebase Auth (ej. falta de red), procesar registro local
+                            completarRegistroLocal(nuevaCuenta)
+                            alFinalizar(true, null)
+                        }
+                    }
+                }
+        } else {
+            // Procesar registro únicamente si no está duplicado
+            completarRegistroLocal(nuevaCuenta)
+            alFinalizar(true, null)
+        }
+    }
+
+    private fun completarRegistroLocal(nuevaCuenta: CuentaUsuario) {
+        guardarUsuarioRegistrado(nuevaCuenta)
+        _nombreUsuarioActual.value = nuevaCuenta.nombre
+        _correoUsuarioActual.value = nuevaCuenta.correo
+        prefs?.edit()
+            ?.putString("logged_in_email", nuevaCuenta.correo)
+            ?.putString("logged_in_name", nuevaCuenta.nombre)
+            ?.apply()
     }
 
     fun iniciarSesion(correo: String, contrasena: String, alFinalizar: (Boolean, String?) -> Unit) {

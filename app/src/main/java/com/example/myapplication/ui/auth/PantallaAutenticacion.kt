@@ -340,7 +340,9 @@ fun PantallaRegistroCuenta(alRegistrarExitoso: (String) -> Unit, alIniciarSesion
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 enabled = !estaCargando,
-                isError = mensajeError?.contains("correo", ignoreCase = true) == true
+                isError = mensajeError?.contains("correo", ignoreCase = true) == true ||
+                        mensajeError?.contains("registrado", ignoreCase = true) == true ||
+                        mensajeError?.contains("uso", ignoreCase = true) == true
             )
 
             Spacer(modifier = Modifier.height(16.dp))

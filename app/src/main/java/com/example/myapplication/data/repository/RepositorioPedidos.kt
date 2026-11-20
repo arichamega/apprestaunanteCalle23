@@ -2,6 +2,7 @@ package com.example.myapplication.data.repository
 
 import android.util.Log
 import com.example.myapplication.data.model.EstadoPedido
+import com.example.myapplication.data.model.ItemPedido
 import com.example.myapplication.data.model.Pedido
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,9 +18,94 @@ object RepositorioPedidos {
 
     private val firestore: FirebaseFirestore? by lazy {
         try {
-            FirebaseFirestore.getInstance()
-        } catch (_: Exception) {
+            val db = FirebaseFirestore.getInstance()
+            iniciarEscuchaFirestore(db)
+            db
+        } catch (e: Exception) {
+            Log.e("Firestore", "Error al inicializar Firestore en RepositorioPedidos: ${e.message}")
             null
+        }
+    }
+
+    init {
+        // Inicializar la conexión y la escucha en tiempo real de Firestore
+        firestore
+    }
+
+    private fun iniciarEscuchaFirestore(db: FirebaseFirestore) {
+        try {
+            db.collection("orders").addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("Firestore", "❌ Error al escuchar comandas en tiempo real: ${error.message}", error)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    val listaPedidos = mutableListOf<Pedido>()
+                    var maxIdNum = 100
+
+                    for (document in snapshot.documents) {
+                        try {
+                            val id = document.getString("id") ?: document.id.removePrefix("order_")
+                            val idNum = id.toIntOrNull()
+                            if (idNum != null && idNum > maxIdNum) {
+                                maxIdNum = idNum
+                            }
+
+                            val idUsuario = document.getString("idUsuario") ?: ""
+                            val precioTotal = (document.getDouble("precioTotal")
+                                ?: document.getLong("precioTotal")?.toDouble() ?: 0.0)
+                            val numeroMesa = document.getLong("numeroMesa")?.toInt()
+                            val estadoStr = document.getString("estado") ?: "RECIBIDO"
+                            val estado = try {
+                                EstadoPedido.valueOf(estadoStr)
+                            } catch (_: Exception) {
+                                EstadoPedido.RECIBIDO
+                            }
+                            val estaPagado = document.getBoolean("estaPagado") ?: false
+                            val marcaTiempo = document.getLong("marcaTiempo") ?: System.currentTimeMillis()
+
+                            val rawItems = document.get("items") as? List<Map<String, Any>> ?: emptyList()
+                            val items = rawItems.map { map ->
+                                ItemPedido(
+                                    idPlato = map["idPlato"]?.toString() ?: "",
+                                    nombrePlato = map["nombrePlato"]?.toString() ?: "",
+                                    cantidad = (map["cantidad"] as? Long)?.toInt()
+                                        ?: (map["cantidad"] as? Int)
+                                        ?: 1,
+                                    precio = (map["precio"] as? Double)
+                                        ?: (map["precio"] as? Long)?.toDouble()
+                                        ?: (map["precio"] as? Int)?.toDouble()
+                                        ?: 0.0,
+                                    notas = map["notas"]?.toString() ?: ""
+                                )
+                            }
+
+                            listaPedidos.add(
+                                Pedido(
+                                    id = id,
+                                    idUsuario = idUsuario,
+                                    items = items,
+                                    precioTotal = precioTotal,
+                                    estado = estado,
+                                    estaPagado = estaPagado,
+                                    marcaTiempo = marcaTiempo,
+                                    numeroMesa = numeroMesa
+                                )
+                            )
+                        } catch (e: Exception) {
+                            Log.e("Firestore", "Error parseando la comanda ${document.id}: ${e.message}", e)
+                        }
+                    }
+
+                    contadorPedidos = maxOf(contadorPedidos, maxIdNum + 1)
+                    val listaOrdenada = listaPedidos.sortedByDescending { it.id.toIntOrNull() ?: 0 }
+                    _pedidos.value = listaOrdenada
+                    Log.d("Firestore", "✅ Sincronizadas ${listaOrdenada.size} comandas en tiempo real desde Firestore")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Firestore", "Excepción al iniciar escucha de Firestore: ${e.message}", e)
         }
     }
 
@@ -28,7 +114,7 @@ object RepositorioPedidos {
         contadorPedidos++
         val nuevoPedido = pedido.copy(id = idSecuencial)
         
-        _pedidos.update { it + nuevoPedido }
+        _pedidos.update { (it.filterNot { p -> p.id == idSecuencial } + nuevoPedido).sortedByDescending { p -> p.id.toIntOrNull() ?: 0 } }
 
         try {
             val datosPedido = hashMapOf(
